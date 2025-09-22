@@ -1,12 +1,13 @@
 // Hex.js
 export class Hex {
-  constructor(q, r, s, terrain, terrainColor,height, temp) {
+  constructor(q, r, s, terrain, terrainColor,height,precipitation = 0, temp) {
     this.q = q;
     this.r = r;
     this.s = s;
     this.terrain = terrain;
     this.terrainColor = terrainColor;
     this.height = height; // <--- new
+    this.precipitation = precipitation;
     this.temp = temp;
 
     // lower-level data

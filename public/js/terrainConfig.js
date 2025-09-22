@@ -59,37 +59,61 @@ export const TERRAIN_TYPES = {
     groundResources: { stone: [0,15], limestone: [0,5], coal: [0,5], iron: [0,5], gold: [0,1], salt: [0,0] },
     topSoil: { wood: [0,3], food: [1,5], meat: [0,2], soil: [1,3], sand: [0,1], clay: [0,1] },
     terrainColor: "palegreen"
+  },
+  DeepOcean: {
+    weight: 0.1,
+    groundResources: { stone: [0, 0], limestone: [0, 0], coal: [0, 0], iron: [0, 0], gold: [0, 0], salt: [0, 0] },
+    topSoil: { wood: [0, 0], food: [0, 0], meat: [0, 0], soil: [0, 0], sand: [0, 0], clay: [0, 0] },
+    terrainColor: "darkblue"
+  },
+  ShallowSea: {
+    weight: 0.1,
+    groundResources: { stone: [0, 0], limestone: [0, 0], coal: [0, 0], iron: [0, 0], gold: [0, 0], salt: [0, 0] },
+    topSoil: { wood: [0, 0], food: [0, 0], meat: [0, 0], soil: [0, 0], sand: [0, 0], clay: [0, 0] },
+    terrainColor: "blue"
+  },
+  Coast: {
+    weight: 0.1,
+    groundResources: { stone: [0, 2], limestone: [0, 1], coal: [0, 0], iron: [0, 1], gold: [0, 0], salt: [0, 1] },
+    topSoil: { wood: [0, 1], food: [0, 3], meat: [0, 1], soil: [0, 1], sand: [0, 2], clay: [0, 1] },
+    terrainColor: "lightblue"
   }
 };
 
 
-// Map height 0-5000m to 10 color bands
+// Map height -1000m to 5000m to 25+ color bands
 export function getHeightColor(height) {
-  if (height < 200) return "#4CAF50";
-  if (height < 400) return "#55C058";
-  if (height < 600) return "#66C66B";
-  if (height < 800) return "#77CC7E";
-  if (height < 1000) return "#88D391";
-  if (height < 1200) return "#99D9A4";
-  if (height < 1400) return "#AADDB7";
-  if (height < 1600) return "#BBE3CA";
-  if (height < 1800) return "#CCE6DD";
-  if (height < 2000) return "#DDE9F0";
-  if (height < 2200) return "#CD853F"; // brownish
-  if (height < 2400) return "#B87333";
-  if (height < 2600) return "#A0522D";
-  if (height < 2800) return "#8B4513";
-  if (height < 3000) return "#704214";
-  if (height < 3200) return "#5A3611";
-  if (height < 3400) return "#44400D";
-  if (height < 3600) return "#808080"; // gray
-  if (height < 3800) return "#A9A9A9";
-  if (height < 4000) return "#C0C0C0";
-  if (height < 4200) return "#D3D3D3";
-  if (height < 4400) return "#E6E6E6";
-  if (height < 4600) return "#F2F2F2";
-  if (height < 4800) return "#FAFAFA";
-  return "#FFFFFF"; // snow/ice
+  // Sea levels
+  if (height < -200) return "#00008B";   // deep ocean
+  if (height < -100) return "#0000CD";   // mid ocean
+  if (height < 0) return "#1E90FF";      // shallow sea / near coast
+
+  // Land levels
+  if (height < 100) return "#F4E1A0"; // light sandy color   // near coast
+  if (height < 400) return "#4CAF50";    // very low land, green
+  if (height < 600) return "#55C058";
+  if (height < 800) return "#66C66B";
+  if (height < 1000) return "#77CC7E";
+  if (height < 1200) return "#88D391";
+  if (height < 1400) return "#99D9A4";
+  if (height < 1600) return "#AADDB7";
+  if (height < 1800) return "#BBE3CA";
+  if (height < 2000) return "#CCE6DD";
+  if (height < 2200) return "#DDE9F0";
+  if (height < 2400) return "#CD853F";    // brownish
+  if (height < 2600) return "#B87333";
+  if (height < 2800) return "#A0522D";
+  if (height < 3000) return "#8B4513";
+  if (height < 3200) return "#704214";
+  if (height < 3400) return "#5A3611";
+  if (height < 3600) return "#44400D";
+  if (height < 3800) return "#808080";    // gray
+  if (height < 4000) return "#A9A9A9";
+  if (height < 4200) return "#C0C0C0";
+  if (height < 4400) return "#D3D3D3";
+  if (height < 4600) return "#E6E6E6";
+  if (height < 4800) return "#F2F2F2";
+  return "#FFFFFF";                        // snow/ice
 }
 // Map temperature -70 to 15°C to colors (cold = blue, warm = red)
 export function getTempColor(temp) {
@@ -126,3 +150,63 @@ export function getTempColor(temp) {
 
   return "#000000";                     // Extreme cold, below -40°C
 }
+
+export function getPrecipitationColor(precipitation) {
+  if (precipitation < 50) return "#F0E68C";   // very dry, yellow
+  if (precipitation < 100) return "#C2E699";  // dry, light green
+  if (precipitation < 150) return "#66C2A5";  // moderate, green-blue
+  if (precipitation < 200) return "#3288BD";  // wet, blue
+  if (precipitation < 250) return "#5E4FA2";  // very wet, dark purple
+  return "#2E0854";                     // extreme, deep purple
+}
+
+
+
+
+// if statements are bad so consider using this when things start to get to much to manage. 
+// const heightColors = [
+//   { max: 0, color: "#00008B" },
+//   { max: 200, color: "#0000CD" },
+//   { max: 400, color: "#1E90FF" },
+//   { max: 600, color: "#00BFFF" },
+//   { max: 800, color: "#87CEFA" },
+//   { max: 1000, color: "#4CAF50" },
+//   { max: 1200, color: "#55C058" },
+//   // ... continue
+//   { max: 5000, color: "#D3D3D3" },
+//   { max: Infinity, color: "#FFFFFF" }
+// ];
+
+// export function getHeightColor(height) {
+//   for (let i = 0; i < heightColors.length; i++) {
+//     if (height < heightColors[i].max) return heightColors[i].color;
+//   }
+// }
+
+
+// function lerpColor(a, b, t) {
+//   const parse = c => c.match(/\w\w/g).map(h => parseInt(h, 16));
+//   const [r1,g1,b1] = parse(a);
+//   const [r2,g2,b2] = parse(b);
+//   const r = Math.round(r1 + (r2-r1)*t);
+//   const g = Math.round(g1 + (g2-g1)*t);
+//   const b = Math.round(b1 + (b2-b1)*t);
+//   return `rgb(${r},${g},${b})`;
+// }
+
+// const gradient = [
+//   { height: -1000, color: "#00008B" },
+//   { height: 0, color: "#87CEFA" },
+//   { height: 800, color: "#4CAF50" },
+//   { height: 5000, color: "#FFFFFF" }
+// ];
+
+// export function getHeightColor(height) {
+//   for (let i = 0; i < gradient.length - 1; i++) {
+//     if (height >= gradient[i].height && height < gradient[i+1].height) {
+//       const t = (height - gradient[i].height) / (gradient[i+1].height - gradient[i].height);
+//       return lerpColor(gradient[i].color, gradient[i+1].color, t);
+//     }
+//   }
+//   return gradient[gradient.length-1].color;
+// }

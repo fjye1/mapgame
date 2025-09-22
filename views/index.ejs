@@ -22,13 +22,23 @@
 
     <script type="module">
       import { generateMap, generateTemperature } from "/js/mapGenerator.js"; // <--- add this
-      import { getHeightColor, getTempColor } from "/js/terrainConfig.js";
+      import {
+        getHeightColor,
+        getTempColor,
+        getPrecipitationColor,
+      } from "/js/terrainConfig.js";
       import { getDateFromDay, totalDays } from "/js/dateUtils.js";
+
+      const size = 20;
 
       let zoomLevel = 1;
       const zoomStep = 0.1;
       const minZoom = 0.5;
       const maxZoom = 2;
+
+      let currentView = "terrain"; // global default
+      let views = ["terrain", "height", "temp", "precipitation"];
+      let currentViewIndex = 0;
 
       function zoom(containerId, delta) {
         const container = document.getElementById(containerId);
@@ -109,6 +119,7 @@
       // Initial map generation
       document.getElementById("btn-generate").addEventListener("click", () => {
         currentMap = generateMap(32, currentDay); // save globally
+        console.log("Current view on generate:", currentView);
         drawHexGrid("hex-container", currentMap, size, currentView);
       });
 
@@ -116,8 +127,6 @@
       updateDisplay();
 
       //generate hexes
-
-      const size = 20;
 
       function cubeToPixel(hex, size) {
         const x = 1.5 * size * hex.q; // horizontal
@@ -157,14 +166,17 @@
           div.style.left = `${pos.horiz - minX}px`;
           div.style.top = `${pos.vert - minY}px`;
 
-          // Set color based on current view
-          if (view === "terrain") div.style.backgroundColor = hex.terrainColor;
-          else if (view === "height")
-            div.style.backgroundColor = getHeightColor(hex.height);
-          else if (view === "temp")
-            div.style.backgroundColor = getTempColor(hex.temp);
-
+          // Tooltip
           div.title = `q:${hex.q} r:${hex.r} s:${hex.s} Terrain:${hex.terrain}`;
+
+          // Assign color immediately based on current view
+          const colorMap = {
+            terrain: hex.terrainColor,
+            height: getHeightColor(hex.height),
+            temp: getTempColor(hex.temp),
+            precipitation: getPrecipitationColor(hex.precipitation),
+          };
+          div.style.backgroundColor = colorMap[view];
 
           div.addEventListener("click", () => {
             const gr = hex.groundResources;
@@ -175,6 +187,7 @@
                 `Terrain: ${hex.terrain}\n\n` +
                 `Height: ${hex.height}\n\n` +
                 `Temp: ${hex.temp}\n\n` +
+                `precipitation: ${hex.precipitation}\n\n` +
                 `Ground Resources:\n` +
                 `  Stone: ${gr.stone.amount} (EOE: ${gr.stone.eoe})\n` +
                 `  Limestone: ${gr.limestone.amount} (EOE: ${gr.limestone.eoe})\n` +
@@ -197,31 +210,28 @@
 
         container.appendChild(innerDiv);
       }
-      let currentView = "terrain"; // default view
 
       document.getElementById("btn-toggle").addEventListener("click", () => {
-        if (!currentMap.length) return; // do nothing if map not generated
+        if (!currentMap.length) return;
 
         const container = document.getElementById("hex-container");
         const hexDivs = container.querySelectorAll(".hex");
 
-        // cycle view
-        currentView =
-          currentView === "terrain"
-            ? "height"
-            : currentView === "height"
-            ? "temp"
-            : "terrain";
+        // cycle to next view
+        currentViewIndex = (currentViewIndex + 1) % views.length;
+        currentView = views[currentViewIndex]; // update the global variable
 
         hexDivs.forEach((div, i) => {
           const hex = currentMap[i];
-          if (currentView === "terrain") {
-            div.style.backgroundColor = hex.terrainColor;
-          } else if (currentView === "height") {
-            div.style.backgroundColor = getHeightColor(hex.height); // define getHeightColor()
-          } else if (currentView === "temp") {
-            div.style.backgroundColor = getTempColor(hex.temp); // define getTempColor()
-          }
+
+          const colorMap = {
+            terrain: hex.terrainColor,
+            height: getHeightColor(hex.height),
+            temp: getTempColor(hex.temp),
+            precipitation: getPrecipitationColor(hex.precipitation),
+          };
+
+          div.style.backgroundColor = colorMap[currentView];
         });
       });
     </script>

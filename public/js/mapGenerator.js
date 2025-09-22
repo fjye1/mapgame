@@ -4,25 +4,43 @@ import { getDateFromDay } from "/js/dateUtils.js";
 
 
 
-export function generateTemperature(q, r, s, height, dayOfYear, mapRadius = 32, minTemp = -20, maxTemp = 20) {
+export function generateTemperature(
+  q,
+  r,
+  s,
+  height,
+  dayOfYear,
+  mapRadius = 32,
+  minTemp = -20,
+  maxTemp = 20
+) {
   console.log({ q, r, s, height, dayOfYear }); // <--- first check
 
-  if ([q, r, s, height, dayOfYear].some(v => typeof v !== 'number')) {
+  if ([q, r, s, height, dayOfYear].some(v => typeof v !== "number")) {
     console.error("Invalid argument detected!");
     return 0; // fallback
   }
 
+  // Base temperature from latitude
   const northSouth = r - s;
   let tempNorm = (northSouth + mapRadius) / (2 * mapRadius);
   tempNorm = Math.max(0, Math.min(1, tempNorm));
-
   let temp = minTemp + tempNorm * (maxTemp - minTemp);
 
+  // Seasonal variation
   const totalDays = 1461;
   const phase = (dayOfYear / totalDays) * 2 * Math.PI;
-  const seasonalAmplitude = 0.5 * (maxTemp - minTemp);
-  temp += seasonalAmplitude * Math.sin(phase - Math.PI / 2);
+  let seasonalFactor = Math.sin(phase - Math.PI / 2);
 
+  // Coastal moderation (dampen swing if very low-lying)
+  if (height < 100) {
+    seasonalFactor *= 0.95; // shrink swing range
+  }
+
+  const seasonalAmplitude = 0.5 * (maxTemp - minTemp);
+  temp += seasonalAmplitude * seasonalFactor;
+
+  // Height adjustment (lapse rate)
   const heightModifier = (height / 1000) * 6.5;
   temp -= heightModifier;
 
@@ -32,8 +50,8 @@ export function generateTemperature(q, r, s, height, dayOfYear, mapRadius = 32, 
 }
 
 // height generation function
-function generateHeight(q, r, seed = 1994, options = {}) {
-  const { scale = 0.05, heightRange = 5000 } = options;
+function generateHeight(q, r, seed = 78654, options = {}) {
+  const { scale = 0.05, minHeight = -1000, maxHeight = 5000 } = options;
 
   const x = (3 / 2) * q;
   const y = Math.sqrt(3) * (r + q / 2);
@@ -51,36 +69,40 @@ function generateHeight(q, r, seed = 1994, options = {}) {
     frequency *= 2;
   }
 
-  height = (height + 2) / 4; // normalize roughly 0-1
-  return Math.floor(height * heightRange);
+  // Normalize from approx -2 → +2 into 0 → 1
+  let norm = (height + 2) / 4;
+
+  // Map 0 → 1 into minHeight → maxHeight
+  return Math.floor(minHeight + norm * (maxHeight - minHeight));
 }
 
 function terrainWeightByHeight(height) {
   return {
-    // Very high elevation (80-100)
-    AlpineMeadow: height > 85 ? 0.8 : height > 80 ? 0.4 : 0.05,
-    Tundra: height > 75 ? 0.7 : height > 70 ? 0.3 : 0.1,
+    // Deep ocean (-1000 to -200)
+    DeepOcean: height < -200 ? 0.8 : height < -100 ? 0.4 : 0.1,
 
-    // High elevation (60-80)
-    Taiga:
-      height > 60 && height <= 75
-        ? 0.6
-        : height > 55 && height <= 80
-        ? 0.3
-        : 0.15,
-    Plateau: height > 65 && height <= 85 ? 0.5 : 0.1,
+    // Shallow seas (-200 to -20)
+    ShallowSea: height >= -200 && height < -20 ? 0.6 : 0.1,
 
-    // Mid elevation (30-60)
-    Steppe: height > 25 && height <= 55 ? 0.5 : 0.1,
-    Valley: height > 15 && height <= 45 ? 0.4 : 0.1,
+    // Coast (-20 to 0)
+    Coast: height >= -20 && height <= 0 ? 0.8 : 0.2,
 
-    // Low elevation (0-40)
-    Lowland: height > 20 && height <= 50 ? 0.6 : 0.2,
-    CoastalPlain: height <= 30 ? 0.5 : height <= 40 ? 0.2 : 0.05,
+    // Lowland plains (0 to 1000)
+    Lowland: height > 0 && height <= 1000 ? 0.6 : 0.2,
+    RiverDelta: height <= 200 && height >= 0 ? 0.7 : 0.1,
+    Marsh: height <= 300 && height > 0 ? 0.5 : 0.1,
 
-    // Very low elevation (0-25)
-    RiverDelta: height <= 15 ? 0.7 : height <= 25 ? 0.3 : 0.05,
-    Marsh: height <= 20 ? 0.4 : height <= 30 ? 0.2 : 0.02,
+    // Mid elevations (1000–3000)
+    Valley: height > 1000 && height <= 2000 ? 0.5 : 0.1,
+    Steppe: height > 800 && height <= 2500 ? 0.5 : 0.1,
+    Plateau: height > 1500 && height <= 3000 ? 0.5 : 0.1,
+
+    // High elevations (3000–4000)
+    Taiga: height > 2500 && height <= 3500 ? 0.5 : 0.1,
+    Tundra: height > 3000 && height <= 4000 ? 0.6 : 0.1,
+
+    // Alpine (4000–5000)
+    AlpineMeadow: height > 4000 ? 0.7 : 0.1,
   };
 }
 
@@ -97,6 +119,100 @@ function randomInRange([min, max]) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+export function generatePrecipitation(hexMap, options = {}) {
+  const {
+    seaLevel = 0,
+    maxCoastalRain = 200,  // mm/year, or arbitrary units
+    inlandDropoff = 5,      // rain reduction per hex inland
+    mountainThreshold = 2000, // height above which mountains influence rain
+    minRain = 0,
+    maxRain = 250,
+  } = options;
+
+  // Helper: cube distance between two hexes
+  function cubeDistance(a, b) {
+  if (!a || !b) {
+    console.warn("cubeDistance got null hex:", a, b);
+    return Infinity; // safe fallback
+  }
+  return Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.s - b.s));
+}
+
+  // Helper: find nearest coastal hex
+  const coastHexes = hexMap.filter(h => h.height <= seaLevel);
+
+  function getNearestCoast(hex) {
+    let minDist = Infinity;
+    let nearest = null;
+    for (const coast of coastHexes) {
+      const dist = cubeDistance(hex, coast);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = coast;
+      }
+    }
+    return { nearest, distance: minDist };
+  }
+
+  // Helper: simple line interpolation between two hexes
+  function cubeLerp(a, b, t) {
+    return {
+      q: a.q + (b.q - a.q) * t,
+      r: a.r + (b.r - a.r) * t,
+      s: a.s + (b.s - a.s) * t,
+    };
+  }
+
+  function cubeLine(a, b) {
+    const N = cubeDistance(a, b);
+    const line = [];
+    for (let i = 0; i <= N; i++) {
+      const t = N === 0 ? 0 : i / N;
+      line.push(cubeLerp(a, b, t));
+    }
+    return line;
+  }
+
+  // Check if mountains block line to coast
+  function hasMountainBarrier(hex, coastHex) {
+    const line = cubeLine(hex, coastHex);
+    for (const point of line) {
+      const mapHex = hexMap.find(h => h.q === Math.round(point.q) && h.r === Math.round(point.r));
+      if (mapHex && mapHex.height > mountainThreshold) return true;
+    }
+    return false;
+  }
+
+  // Assign precipitation to each hex
+for (const hex of hexMap) {
+  if (hex.height <= seaLevel) {
+    hex.precipitation = 0; // water tile
+    continue;
+  }
+
+  const { nearest, distance } = getNearestCoast(hex);
+
+  if (!nearest) {
+    // no coast exists, assign minimum rain and skip further checks
+    hex.precipitation = minRain;
+    continue;
+  }
+
+  let baseRain = maxCoastalRain - distance * inlandDropoff;
+
+  if (hasMountainBarrier(hex, nearest)) {
+    baseRain *= 0.3; // rain shadow
+  } else if (hex.height > mountainThreshold) {
+    baseRain *= 1.5; // windward bonus
+  }
+
+  hex.precipitation = Math.max(minRain, Math.min(maxRain, baseRain));
+}
+
+return hexMap;
+}
+
+// Generate the map 
 export function generateMap(radius, dayOfYear) {
   const hexes = [];
   for (let q = -radius; q <= radius; q++) {
@@ -106,6 +222,7 @@ export function generateMap(radius, dayOfYear) {
       // get height
       const height = generateHeight(q, r,undefined,  {
         scale: 0.03,
+        minHeight: -1000,
         heightRange: 5000,
       });
       //get temp
@@ -153,12 +270,15 @@ export function generateMap(radius, dayOfYear) {
         randomInRange(topConfig.clay)
       );
 
-      const hex = new Hex(q, r, s, terrain, config.terrainColor, height, temp);
+      const hex = new Hex(q, r, s, terrain, config.terrainColor, height, undefined, temp);
       hex.groundResources = ground;
       hex.topSoil = topSoil;
 
       hexes.push(hex);
     }
   }
+  generatePrecipitation(hexes)
   return hexes;
+  
 }
+
