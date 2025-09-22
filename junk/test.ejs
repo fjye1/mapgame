@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Flat-Topped Hex Grid</title>
+    <style>
+      #hex-container {
+        position: relative;
+        width: 800px;
+        height: 600px;
+        margin: auto;
+        background: #fafafa;
+      }
+      .hex {
+        position: absolute;
+        background: lightblue;
+        text-align: center;
+        font-size: 10px;
+        line-height: 1;
+        clip-path: polygon(
+          25% 0%,
+          75% 0%,
+          100% 50%,
+          75% 100%,
+          25% 100%,
+          0% 50%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hex-container"></div>
+    <script>
+      const size = 30; // center-to-corner
+      const board = new Map(); // key: 'q,r,s', value: { terrain, unit, etc. }
+
+      class Cube {
+        constructor(q, r, s) {
+          this.q = q;
+          this.r = r;
+          this.s = s;
+          if (Math.round(q + r + s) !== 0) throw "q+r+s must = 0";
+        }
+      }
+
+      // Generate hexes in a radius
+      function generateHexGrid(radius) {
+        const hexes = [];
+        for (let q = -radius; q <= radius; q++) {
+          for (let r = -radius; r <= radius; r++) {
+            let s = -q - r;
+            if (Math.abs(s) <= radius) hexes.push(new Cube(q, r, s));
+          }
+        }
+        return hexes;
+      }
+
+      // Convert cube to pixel (flat-topped)
+      function cubeToPixel(cube, size) {
+        const x = 1.5 * size * cube.q; // horizontal step
+        const y = Math.sqrt(3) * size * (cube.r + cube.q / 2); // vertical step with stagger
+        return { horiz: x, vert: y };
+      }
+
+      function drawHexGrid(containerId, radius) {
+        const container = document.getElementById(containerId);
+        const hexes = generateHexGrid(radius);
+        container.innerHTML = "";
+
+        const offsetX = container.offsetWidth / 2;
+        const offsetY = container.offsetHeight / 2;
+
+        hexes.forEach((hex) => {
+          // Store terrain/unit info
+          board.set(`${hex.q},${hex.r},${hex.s}`, {
+            terrain: "plain",
+            unit: null,
+          });
+
+          const pos = cubeToPixel(hex, size);
+          const div = document.createElement("div");
+          div.className = "hex";
+
+          // Size of hex
+          div.style.width = `${2 * size}px`;
+          div.style.height = `${Math.sqrt(3) * size}px`;
+
+          // Position
+          div.style.left = `${pos.horiz + offsetX}px`;
+          div.style.top = `${pos.vert + offsetY}px`;
+
+          // Display coords and title
+          div.innerText = `${hex.q},${hex.r}`;
+          div.title = `Cube: (${hex.q},${hex.r},${hex.s})`;
+
+          // Terrain color
+          div.style.background = "red"; // or assign based on terrain
+
+          // Click event
+          div.addEventListener("click", () => {
+            console.log(`You clicked hex: q=${hex.q}, r=${hex.r}, s=${hex.s}`);
+          });
+
+          container.appendChild(div);
+        });
+      }
+
+      window.onload = () => drawHexGrid("hex-container", 5);
+    </script>
+  </body>
+</html>

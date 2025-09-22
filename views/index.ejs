@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hex Grid Display</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <h1 id="date-display">Year 1 – January 1 – Day 1</h1>
+    <div id="info">Click a hex to see its data</div>
+    <div id="hex-container"></div>
+
+    <div id="button-container">
+      <button id="btn-generate">Generate Map</button>
+      <button id="btn-toggle">Toggle View</button>
+      <button id="next-day">Next Day</button>
+      <button id="zoom-in">Zoom In</button>
+      <button id="zoom-out">Zoom Out</button>
+      <!-- new toggle button -->
+    </div>
+
+    <script type="module">
+      import { generateMap, generateTemperature } from "/js/mapGenerator.js"; // <--- add this
+      import { getHeightColor, getTempColor } from "/js/terrainConfig.js";
+      import { getDateFromDay, totalDays } from "/js/dateUtils.js";
+
+      let zoomLevel = 1;
+      const zoomStep = 0.1;
+      const minZoom = 0.5;
+      const maxZoom = 2;
+
+      function zoom(containerId, delta) {
+        const container = document.getElementById(containerId);
+        const innerDiv = container.firstElementChild;
+        if (!innerDiv) return;
+
+        // Current viewport center in container coordinates
+        const centerX = container.scrollLeft + container.clientWidth / 2;
+        const centerY = container.scrollTop + container.clientHeight / 2;
+
+        // Update zoom level
+        const oldZoom = zoomLevel;
+        zoomLevel = Math.max(minZoom, Math.min(maxZoom, zoomLevel + delta));
+
+        // Apply scale
+        innerDiv.style.transform = `scale(${zoomLevel})`;
+        innerDiv.style.transformOrigin = "top left";
+
+        // Adjust scroll to keep same center
+        container.scrollLeft =
+          (centerX / oldZoom) * zoomLevel - container.clientWidth / 2;
+        container.scrollTop =
+          (centerY / oldZoom) * zoomLevel - container.clientHeight / 2;
+      }
+
+      function setZoom(containerId) {
+        const container = document.getElementById(containerId);
+        const innerDiv = container.firstElementChild;
+        if (!innerDiv) return;
+        innerDiv.style.transform = `scale(${zoomLevel})`;
+        innerDiv.style.transformOrigin = "top left";
+      }
+
+      document.getElementById("zoom-in").addEventListener("click", () => {
+        zoom("hex-container", zoomStep);
+      });
+
+      document.getElementById("zoom-out").addEventListener("click", () => {
+        zoom("hex-container", -zoomStep);
+      });
+
+      let currentMap = [];
+      let currentDay = 300;
+      let currentYear = 1;
+
+      function updateDisplay() {
+        const { month, day } = getDateFromDay(currentDay);
+        document.getElementById(
+          "date-display"
+        ).textContent = `Year ${currentYear} – ${month} ${day} – Day ${currentDay}`;
+      }
+
+      // Next Day button
+      document.getElementById("next-day").addEventListener("click", () => {
+        currentDay++;
+        if (currentDay > totalDays) {
+          currentDay = 1;
+          currentYear++;
+        }
+
+        updateDisplay();
+
+        // update temperatures only
+        currentMap.forEach((hex) => {
+          hex.temp = generateTemperature(
+            hex.q,
+            hex.r,
+            hex.s,
+            hex.height,
+            currentDay
+          );
+        });
+
+        drawHexGrid("hex-container", currentMap, size, currentView); // redraw with updated temps
+        setZoom("hex-container"); // reapply zoom
+      });
+
+      // Initial map generation
+      document.getElementById("btn-generate").addEventListener("click", () => {
+        currentMap = generateMap(32, currentDay); // save globally
+        drawHexGrid("hex-container", currentMap, size, currentView);
+      });
+
+      // initial display
+      updateDisplay();
+
+      //generate hexes
+
+      const size = 20;
+
+      function cubeToPixel(hex, size) {
+        const x = 1.5 * size * hex.q; // horizontal
+        const y = Math.sqrt(3) * size * (hex.r + hex.q / 2); // vertical
+        return { horiz: x, vert: y };
+      }
+
+      function drawHexGrid(containerId, hexes, size, view = "terrain") {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+
+        // Find bounds of the grid
+        let minX = Infinity,
+          maxX = -Infinity,
+          minY = Infinity,
+          maxY = -Infinity;
+        hexes.forEach((hex) => {
+          const { horiz, vert } = cubeToPixel(hex, size);
+          minX = Math.min(minX, horiz);
+          maxX = Math.max(maxX, horiz);
+          minY = Math.min(minY, vert);
+          maxY = Math.max(maxY, vert);
+        });
+
+        const contentWidth = maxX - minX + size;
+        const contentHeight = maxY - minY + size;
+
+        const innerDiv = document.createElement("div");
+        innerDiv.style.position = "relative";
+        innerDiv.style.width = contentWidth + "px";
+        innerDiv.style.height = contentHeight + "px";
+
+        hexes.forEach((hex) => {
+          const pos = cubeToPixel(hex, size);
+          const div = document.createElement("div");
+          div.className = "hex";
+          div.style.left = `${pos.horiz - minX}px`;
+          div.style.top = `${pos.vert - minY}px`;
+
+          // Set color based on current view
+          if (view === "terrain") div.style.backgroundColor = hex.terrainColor;
+          else if (view === "height")
+            div.style.backgroundColor = getHeightColor(hex.height);
+          else if (view === "temp")
+            div.style.backgroundColor = getTempColor(hex.temp);
+
+          div.title = `q:${hex.q} r:${hex.r} s:${hex.s} Terrain:${hex.terrain}`;
+
+          div.addEventListener("click", () => {
+            const gr = hex.groundResources;
+            const ts = hex.topSoil;
+
+            alert(
+              `Hex: q=${hex.q} r=${hex.r} s=${hex.s}\n` +
+                `Terrain: ${hex.terrain}\n\n` +
+                `Height: ${hex.height}\n\n` +
+                `Temp: ${hex.temp}\n\n` +
+                `Ground Resources:\n` +
+                `  Stone: ${gr.stone.amount} (EOE: ${gr.stone.eoe})\n` +
+                `  Limestone: ${gr.limestone.amount} (EOE: ${gr.limestone.eoe})\n` +
+                `  Coal: ${gr.coal.amount} (EOE: ${gr.coal.eoe})\n` +
+                `  Iron: ${gr.iron.amount} (EOE: ${gr.iron.eoe})\n` +
+                `  Gold: ${gr.gold.amount} (EOE: ${gr.gold.eoe})\n` +
+                `  Salt: ${gr.salt.amount} (EOE: ${gr.salt.eoe})\n\n` +
+                `Topsoil Resources:\n` +
+                `  Wood: ${ts.wood.amount} (EOE: ${ts.wood.eoe})\n` +
+                `  Food: ${ts.food.amount} (EOE: ${ts.food.eoe})\n` +
+                `  Meat: ${ts.meat.amount} (EOE: ${ts.meat.eoe})\n` +
+                `  Soil: ${ts.soil.amount} (EOE: ${ts.soil.eoe})\n` +
+                `  Sand: ${ts.sand.amount} (EOE: ${ts.sand.eoe})\n` +
+                `  Clay: ${ts.clay.amount} (EOE: ${ts.clay.eoe})`
+            );
+          });
+
+          innerDiv.appendChild(div);
+        });
+
+        container.appendChild(innerDiv);
+      }
+      let currentView = "terrain"; // default view
+
+      document.getElementById("btn-toggle").addEventListener("click", () => {
+        if (!currentMap.length) return; // do nothing if map not generated
+
+        const container = document.getElementById("hex-container");
+        const hexDivs = container.querySelectorAll(".hex");
+
+        // cycle view
+        currentView =
+          currentView === "terrain"
+            ? "height"
+            : currentView === "height"
+            ? "temp"
+            : "terrain";
+
+        hexDivs.forEach((div, i) => {
+          const hex = currentMap[i];
+          if (currentView === "terrain") {
+            div.style.backgroundColor = hex.terrainColor;
+          } else if (currentView === "height") {
+            div.style.backgroundColor = getHeightColor(hex.height); // define getHeightColor()
+          } else if (currentView === "temp") {
+            div.style.backgroundColor = getTempColor(hex.temp); // define getTempColor()
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

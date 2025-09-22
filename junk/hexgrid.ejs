@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hex Grid Display</title>
+    <style>
+      #button-container {
+        position: fixed; /* sticks to bottom */
+        bottom: 10px; /* distance from bottom */
+        left: 50%; /* center horizontally */
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px; /* space between buttons */
+        z-index: 100; /* above other elements */
+      }
+
+      #button-container button {
+        padding: 8px 16px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+      }
+
+      #hex-container {
+        position: relative;
+        width: 800px;
+        height: 800px;
+        margin: auto;
+        background: #fafafa;
+        border: 1px solid #ccc;
+        overflow: hidden;
+      }
+
+      .hex {
+        position: absolute;
+
+        background: lightblue;
+        border: 1px solid #333;
+        text-align: center;
+        font-size: 8px;
+        line-height: 34px;
+        clip-path: polygon(
+          25% 0%,
+          75% 0%,
+          100% 50%,
+          75% 100%,
+          25% 100%,
+          0% 50%
+        );
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .hex:hover {
+        background: lightcoral;
+      }
+
+      #info {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">
+      <h2>Hexagonal Grid (Cube Coordinates)</h2>
+      <p>Hover over hexes to see coordinates. Grid radius: <%= gridRadius %></p>
+    </div>
+    <div id="hex-container" data-grid-radius="<%= gridRadius %>"></div>
+
+    <div id="button-container">
+      <button id="save-btn">Save</button>
+      <button id="load-btn">Load</button>
+      <button id="reset-btn">Reset</button>
+    </div>
+
+    <script>
+      document.getElementById("save-btn").onclick = () =>
+        alert("Save clicked");
+      document.getElementById("load-btn").onclick = () =>
+        alert("Load clicked");
+      document.getElementById("reset-btn").onclick = () =>
+        alert("Reset clicked");
+      const size = 20;
+
+      // Map to store game state
+      const board = new Map();
+
+      // Terrain types and colors
+      const terrainColors = {
+        plain: "lightgreen",
+        forest: "darkgreen",
+        mountain: "grey",
+        water: "lightblue",
+        desert: "khaki",
+        swamp: "darkslategray",
+        hills: "peru",
+        tundra: "lightgrey",
+        beach: "sandybrown",
+        icesheet: "white",
+      };
+
+      // Cube class
+      class Cube {
+        constructor(q, r, s) {
+          this.q = q;
+          this.r = r;
+          this.s = s;
+          if (Math.round(q + r + s) !== 0) throw "q+r+s must = 0";
+        }
+      }
+
+      // Get neighbors
+      function getNeighbors(hex, board) {
+        const directions = [
+          new Cube(+1, 0, -1),
+          new Cube(+1, -1, 0),
+          new Cube(0, -1, +1),
+          new Cube(-1, 0, +1),
+          new Cube(-1, +1, 0),
+          new Cube(0, +1, -1),
+        ];
+
+        return directions
+          .map((dir) => {
+            const key = `${hex.q + dir.q},${hex.r + dir.r},${hex.s + dir.s}`;
+            return board.get(key);
+          })
+          .filter(Boolean);
+      }
+
+      // Weighted random helper
+      function weightedRandom(weights) {
+        const entries = Object.entries(weights);
+        const total = entries.reduce((sum, [, w]) => sum + w, 0);
+        let r = Math.random() * total;
+        for (let [key, weight] of entries) {
+          if (r < weight) return key;
+          r -= weight;
+        }
+      }
+
+      // Generate hexes in cube coordinates
+      function generateHexGrid(radius) {
+        const hexes = [];
+        for (let q = -radius; q <= radius; q++) {
+          for (let r = -radius; r <= radius; r++) {
+            const s = -q - r;
+            if (Math.abs(s) <= radius) hexes.push(new Cube(q, r, s));
+          }
+        }
+        return hexes;
+      }
+
+      // Cube to pixel (flat-topped)
+      function cubeToPixel(cube, size) {
+        const x = 1.5 * size * cube.q; // horizontal
+        const y = Math.sqrt(3) * size * (cube.r + cube.q / 2); // vertical
+        return { horiz: x, vert: y };
+      }
+
+      // Draw grid
+      function drawHexGrid(containerId, radius) {
+        const container = document.getElementById(containerId);
+        const hexes = generateHexGrid(radius);
+        container.innerHTML = "";
+
+        const offsetX = container.offsetWidth / 2;
+        const offsetY = container.offsetHeight / 2;
+
+        hexes.forEach((hex) => {
+          // Assign terrain (random for now)
+          const neighbors = getNeighbors(hex, board);
+          let terrain;
+          const distance = Math.max(
+            Math.abs(hex.q),
+            Math.abs(hex.r),
+            Math.abs(hex.s)
+          );
+          if ((hex.r < -4 && hex.s > 4) || (hex.s < -4 && hex.r > 4)) {
+            // top or bottom of the map with radius 5
+            terrain = weightedRandom({ tundra: 0.7, icesheet: 0.3 });
+          } else if (Math.abs(hex.r) <= 1 && Math.abs(hex.s) <= 1) {
+            // middle strech
+            terrain = weightedRandom({ desert: 1, plain: 0 });
+          } else {
+            terrain = weightedRandom({
+              plain: 0.5,
+              forest: 0.3,
+              mountain: 0.2,
+            });
+          }
+
+          // Store in board
+          board.set(`${hex.q},${hex.r},${hex.s}`, {
+            terrain,
+            unit: null,
+          });
+
+          const pos = cubeToPixel(hex, size);
+          const div = document.createElement("div");
+          div.className = "hex";
+
+          // Size and position
+          div.style.width = `${2 * size}px`;
+          div.style.height = `${Math.sqrt(3) * size}px`;
+          div.style.left = `${pos.horiz + offsetX}px`;
+          div.style.top = `${pos.vert + offsetY}px`;
+
+          // Color and tooltip
+          div.style.backgroundColor = terrainColors[terrain];
+          div.title = `Cube: (${hex.q},${hex.r},${hex.s}) Terrain: ${terrain}`;
+
+          // Click event
+          div.addEventListener("click", () => {
+            alert(
+              `You clicked hex: q=${hex.q}, r=${hex.r}, s=${hex.s}\nThis is a ${terrain} tile`
+            );
+          });
+
+          container.appendChild(div);
+        });
+      }
+
+      window.onload = () => {
+        const container = document.getElementById("hex-container");
+        const gridRadius = parseInt(container.dataset.gridRadius);
+        drawHexGrid("hex-container", gridRadius);
+      };
+    </script>
+  </body>
+</html>

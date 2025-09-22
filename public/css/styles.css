@@ -1,0 +1,53 @@
+#hex-container {
+  position: relative;
+  width: 90vw; /* fixed visible area */
+  height: 80vh; /* fixed visible area */
+  margin: auto;
+  background: #fafafa;
+  border: 1px solid #ccc;
+  overflow: auto; /* scrollbars appear when content overflows */
+}
+
+.hex {
+  position: absolute;
+  width: 40px; /* 2 * size */
+  height: 34.64px; /* sqrt(3) * size */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  text-align: center;
+  line-height: 34.64px; /* same as height */
+  font-size: 8px;
+  border: 1px solid #333;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.hex:hover {
+  background: lightcoral;
+}
+
+#button-container {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+
+#button-container button {
+  padding: 8px 16px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+#info {
+  text-align: center;
+  margin-bottom: 20px;
+}

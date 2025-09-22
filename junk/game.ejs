@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hex Grid Display</title>
+    <style>
+      #button-container {
+        position: fixed;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        z-index: 100;
+      }
+
+      #button-container button {
+        padding: 8px 16px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+      }
+
+      #hex-container {
+        position: relative;
+        width: 800px;
+        height: 800px;
+        margin: auto;
+        background: #fafafa;
+        border: 1px solid #ccc;
+        overflow: hidden;
+      }
+
+      .hex {
+        position: absolute;
+        background: lightblue;
+        border: 1px solid #333;
+        text-align: center;
+        font-size: 8px;
+        line-height: 34px;
+        clip-path: polygon(
+          25% 0%,
+          75% 0%,
+          100% 50%,
+          75% 100%,
+          25% 100%,
+          0% 50%
+        );
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .hex:hover {
+        background: lightcoral;
+      }
+
+      #info {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">Click a hex to see its data</div>
+    <div id="hex-container"></div>
+
+    <div id="button-container">
+      <button id="btn-generate">Generate Map</button>
+    </div>
+
+    <script type="module">
+      import { generateMap } from "/js/mapGenerator.js";
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const btn = document.getElementById("btn-generate");
+
+        btn.addEventListener("click", () => {
+          const map = generateMap(5);
+          console.log("New map:", map);
+          alert(`Generated map with ${map.length} hexes!`);
+        });
+      });
+    </script>
+  </body>
+</html>
