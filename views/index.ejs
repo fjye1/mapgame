@@ -9,6 +9,7 @@
   <body>
     <h1 id="date-display">Year 1 – January 1 – Day 1</h1>
     <div id="info">Click a hex to see its data</div>
+    <div id="viewDisplay"></div>
     <div id="hex-container"></div>
 
     <div id="button-container">
@@ -17,53 +18,64 @@
       <button id="next-day">Next Day</button>
       <button id="zoom-in">Zoom In</button>
       <button id="zoom-out">Zoom Out</button>
-      <!-- new toggle button -->
     </div>
 
     <script type="module">
-      import { generateMap, generateTemperature } from "/js/mapGenerator.js"; // <--- add this
+      import { generateMap } from "/js/map/generateMap.js";
       import {
         getHeightColor,
         getTempColor,
         getPrecipitationColor,
+        getResourceColor,
+        computeResourceMax,
       } from "/js/terrainConfig.js";
       import { getDateFromDay, totalDays } from "/js/dateUtils.js";
+      import { generateTemperature } from "/js/map/climate.js";
+      import {addRiverToHex, generateRivers} from "/js/map/rivers.js"
 
       const size = 20;
-
       let zoomLevel = 1;
-      const zoomStep = 0.1;
-      const minZoom = 0.5;
-      const maxZoom = 2;
+      const zoomStep = 0.1,
+        minZoom = 0.5,
+        maxZoom = 2;
 
-      let currentView = "terrain"; // global default
-      let views = ["terrain", "height", "temp", "precipitation"];
+      let currentView = "terrain";
+      let views = [
+        "terrain",
+        "height",
+        "temp",
+        "precipitation",
+        "stone",
+        "limestone",
+        "coal",
+        "iron",
+        "gold",
+        "salt",
+        "wood",
+        "food",
+        "meat",
+        "soil",
+        "sand",
+        "clay",
+      ];
       let currentViewIndex = 0;
 
-      function zoom(containerId, delta) {
-        const container = document.getElementById(containerId);
-        const innerDiv = container.firstElementChild;
-        if (!innerDiv) return;
+      document.getElementById("viewDisplay").textContent = currentView;
 
-        // Current viewport center in container coordinates
-        const centerX = container.scrollLeft + container.clientWidth / 2;
-        const centerY = container.scrollTop + container.clientHeight / 2;
+      let currentMap = [];
+      let currentDay = 300;
+      let currentYear = 1;
 
-        // Update zoom level
-        const oldZoom = zoomLevel;
-        zoomLevel = Math.max(minZoom, Math.min(maxZoom, zoomLevel + delta));
-
-        // Apply scale
-        innerDiv.style.transform = `scale(${zoomLevel})`;
-        innerDiv.style.transformOrigin = "top left";
-
-        // Adjust scroll to keep same center
-        container.scrollLeft =
-          (centerX / oldZoom) * zoomLevel - container.clientWidth / 2;
-        container.scrollTop =
-          (centerY / oldZoom) * zoomLevel - container.clientHeight / 2;
+      // ----------------- Date display -----------------
+      function updateDisplay() {
+        const { month, day } = getDateFromDay(currentDay);
+        document.getElementById(
+          "date-display"
+        ).textContent = `Year ${currentYear} – ${month} ${day} – Day ${currentDay}`;
       }
+      updateDisplay();
 
+      // ----------------- Zoom -----------------
       function setZoom(containerId) {
         const container = document.getElementById(containerId);
         const innerDiv = container.firstElementChild;
@@ -72,73 +84,44 @@
         innerDiv.style.transformOrigin = "top left";
       }
 
-      document.getElementById("zoom-in").addEventListener("click", () => {
-        zoom("hex-container", zoomStep);
-      });
+      function zoom(containerId, delta) {
+        const container = document.getElementById(containerId);
+        const innerDiv = container.firstElementChild;
+        if (!innerDiv) return;
 
-      document.getElementById("zoom-out").addEventListener("click", () => {
-        zoom("hex-container", -zoomStep);
-      });
+        const centerX = container.scrollLeft + container.clientWidth / 2;
+        const centerY = container.scrollTop + container.clientHeight / 2;
 
-      let currentMap = [];
-      let currentDay = 300;
-      let currentYear = 1;
+        const oldZoom = zoomLevel;
+        zoomLevel = Math.max(minZoom, Math.min(maxZoom, zoomLevel + delta));
 
-      function updateDisplay() {
-        const { month, day } = getDateFromDay(currentDay);
-        document.getElementById(
-          "date-display"
-        ).textContent = `Year ${currentYear} – ${month} ${day} – Day ${currentDay}`;
+        innerDiv.style.transform = `scale(${zoomLevel})`;
+        innerDiv.style.transformOrigin = "top left";
+
+        container.scrollLeft =
+          (centerX / oldZoom) * zoomLevel - container.clientWidth / 2;
+        container.scrollTop =
+          (centerY / oldZoom) * zoomLevel - container.clientHeight / 2;
       }
 
-      // Next Day button
-      document.getElementById("next-day").addEventListener("click", () => {
-        currentDay++;
-        if (currentDay > totalDays) {
-          currentDay = 1;
-          currentYear++;
-        }
+      document
+        .getElementById("zoom-in")
+        .addEventListener("click", () => zoom("hex-container", zoomStep));
+      document
+        .getElementById("zoom-out")
+        .addEventListener("click", () => zoom("hex-container", -zoomStep));
 
-        updateDisplay();
-
-        // update temperatures only
-        currentMap.forEach((hex) => {
-          hex.temp = generateTemperature(
-            hex.q,
-            hex.r,
-            hex.s,
-            hex.height,
-            currentDay
-          );
-        });
-
-        drawHexGrid("hex-container", currentMap, size, currentView); // redraw with updated temps
-        setZoom("hex-container"); // reapply zoom
-      });
-
-      // Initial map generation
-      document.getElementById("btn-generate").addEventListener("click", () => {
-        currentMap = generateMap(32, currentDay); // save globally
-        console.log("Current view on generate:", currentView);
-        drawHexGrid("hex-container", currentMap, size, currentView);
-      });
-
-      // initial display
-      updateDisplay();
-
-      //generate hexes
-
+      // ----------------- Hex grid helpers -----------------
       function cubeToPixel(hex, size) {
-        const x = 1.5 * size * hex.q; // horizontal
-        const y = Math.sqrt(3) * size * (hex.r + hex.q / 2); // vertical
+        const x = 1.5 * size * hex.q;
+        const y = Math.sqrt(3) * size * (hex.r + hex.q / 2);
         return { horiz: x, vert: y };
       }
 
       function drawHexGrid(containerId, hexes, size, view = "terrain") {
         const container = document.getElementById(containerId);
-        container.innerHTML = "";
+        container.innerHTML = ""; // clear
 
-        // Find bounds of the grid
         let minX = Infinity,
           maxX = -Infinity,
           minY = Infinity,
@@ -161,49 +144,71 @@
 
         hexes.forEach((hex) => {
           const pos = cubeToPixel(hex, size);
-          const div = document.createElement("div");
-          div.className = "hex";
+          const div = hex.domElement;
+          div.style.position = "absolute";
           div.style.left = `${pos.horiz - minX}px`;
           div.style.top = `${pos.vert - minY}px`;
 
-          // Tooltip
-          div.title = `q:${hex.q} r:${hex.r} s:${hex.s} Terrain:${hex.terrain}`;
-
-          // Assign color immediately based on current view
-          const colorMap = {
-            terrain: hex.terrainColor,
-            height: getHeightColor(hex.height),
-            temp: getTempColor(hex.temp),
-            precipitation: getPrecipitationColor(hex.precipitation),
-          };
-          div.style.backgroundColor = colorMap[view];
-
-          div.addEventListener("click", () => {
+          // Tooltip / debug alert
+          div.onclick = () => {
             const gr = hex.groundResources;
             const ts = hex.topSoil;
 
             alert(
               `Hex: q=${hex.q} r=${hex.r} s=${hex.s}\n` +
-                `Terrain: ${hex.terrain}\n\n` +
-                `Height: ${hex.height}\n\n` +
-                `Temp: ${hex.temp}\n\n` +
-                `precipitation: ${hex.precipitation}\n\n` +
-                `Ground Resources:\n` +
-                `  Stone: ${gr.stone.amount} (EOE: ${gr.stone.eoe})\n` +
-                `  Limestone: ${gr.limestone.amount} (EOE: ${gr.limestone.eoe})\n` +
-                `  Coal: ${gr.coal.amount} (EOE: ${gr.coal.eoe})\n` +
-                `  Iron: ${gr.iron.amount} (EOE: ${gr.iron.eoe})\n` +
-                `  Gold: ${gr.gold.amount} (EOE: ${gr.gold.eoe})\n` +
-                `  Salt: ${gr.salt.amount} (EOE: ${gr.salt.eoe})\n\n` +
-                `Topsoil Resources:\n` +
-                `  Wood: ${ts.wood.amount} (EOE: ${ts.wood.eoe})\n` +
-                `  Food: ${ts.food.amount} (EOE: ${ts.food.eoe})\n` +
-                `  Meat: ${ts.meat.amount} (EOE: ${ts.meat.eoe})\n` +
-                `  Soil: ${ts.soil.amount} (EOE: ${ts.soil.eoe})\n` +
-                `  Sand: ${ts.sand.amount} (EOE: ${ts.sand.eoe})\n` +
-                `  Clay: ${ts.clay.amount} (EOE: ${ts.clay.eoe})`
+                `Terrain: ${hex.terrain}\nHeight: ${hex.height}\nTemp: ${hex.temp}\nPrecipitation: ${hex.precipitation}\nWaterVolume: ${hex.waterVolume}\n` +
+                `\nGround Resources:\n` +
+                `Stone: ${gr.stone.amount}, Limestone: ${gr.limestone.amount}, Coal: ${gr.coal.amount}, Iron: ${gr.iron.amount}, Gold: ${gr.gold.amount}, Salt: ${gr.salt.amount}` +
+                `\n\nTopSoil:\n` +
+                `Wood: ${ts.wood.amount}, Food: ${ts.food.amount}, Meat: ${ts.meat.amount}, Soil: ${ts.soil.amount}, Sand: ${ts.sand.amount}, Clay: ${ts.clay.amount}`
             );
-          });
+          };
+
+          // Update terrain color per view
+          const resourceMax = computeResourceMax(currentMap);
+
+          const colorMap = {
+            terrain: hex.terrainColor,
+            height: getHeightColor(hex),
+            temp: getTempColor(hex.temp),
+            precipitation: getPrecipitationColor(hex.precipitation),
+
+            // ground resources
+            stone: getResourceColor(
+              hex.groundResources.stone.amount,
+              resourceMax.stone
+            ),
+            limestone: getResourceColor(
+              hex.groundResources.limestone.amount,
+              resourceMax.limestone
+            ),
+            coal: getResourceColor(
+              hex.groundResources.coal.amount,
+              resourceMax.coal
+            ),
+            iron: getResourceColor(
+              hex.groundResources.iron.amount,
+              resourceMax.iron
+            ),
+            gold: getResourceColor(
+              hex.groundResources.gold.amount,
+              resourceMax.gold
+            ),
+            salt: getResourceColor(
+              hex.groundResources.salt.amount,
+              resourceMax.salt
+            ),
+
+            // topsoil resources
+            wood: getResourceColor(hex.topSoil.wood.amount, resourceMax.wood),
+            food: getResourceColor(hex.topSoil.food.amount, resourceMax.food),
+            meat: getResourceColor(hex.topSoil.meat.amount, resourceMax.meat),
+            soil: getResourceColor(hex.topSoil.soil.amount, resourceMax.soil),
+            sand: getResourceColor(hex.topSoil.sand.amount, resourceMax.sand),
+            clay: getResourceColor(hex.topSoil.clay.amount, resourceMax.clay),
+          };
+
+          div.style.backgroundColor = colorMap[currentView];
 
           innerDiv.appendChild(div);
         });
@@ -211,28 +216,51 @@
         container.appendChild(innerDiv);
       }
 
+      // ----------------- Buttons -----------------
+      document.getElementById("btn-generate").addEventListener("click", () => {
+        currentMap = generateMap(32, currentDay);
+        drawHexGrid("hex-container", currentMap, size, currentView);
+        setZoom("hex-container");
+        document.getElementById("viewDisplay").textContent = currentView;
+        currentMap.forEach((hex) => {
+          const container = document.getElementById("hex-container");
+          container.appendChild(hex.domElement);
+
+          // Paint rivers if present
+          if (hex.isRiver) addRiverToHex(hex, hex.flowDirection);
+        });
+      });
+
       document.getElementById("btn-toggle").addEventListener("click", () => {
         if (!currentMap.length) return;
 
-        const container = document.getElementById("hex-container");
-        const hexDivs = container.querySelectorAll(".hex");
-
-        // cycle to next view
         currentViewIndex = (currentViewIndex + 1) % views.length;
-        currentView = views[currentViewIndex]; // update the global variable
+        currentView = views[currentViewIndex];
+        drawHexGrid("hex-container", currentMap, size, currentView);
+        setZoom("hex-container");
+        document.getElementById("viewDisplay").textContent = currentView;
+      });
 
-        hexDivs.forEach((div, i) => {
-          const hex = currentMap[i];
+      document.getElementById("next-day").addEventListener("click", () => {
+        currentDay++;
+        if (currentDay > totalDays) {
+          currentDay = 1;
+          currentYear++;
+        }
+        updateDisplay();
 
-          const colorMap = {
-            terrain: hex.terrainColor,
-            height: getHeightColor(hex.height),
-            temp: getTempColor(hex.temp),
-            precipitation: getPrecipitationColor(hex.precipitation),
-          };
-
-          div.style.backgroundColor = colorMap[currentView];
+        currentMap.forEach((hex) => {
+          hex.temp = generateTemperature(
+            hex.q,
+            hex.r,
+            hex.s,
+            hex.height,
+            currentDay
+          );
         });
+
+        drawHexGrid("hex-container", currentMap, size, currentView);
+        setZoom("hex-container");
       });
     </script>
   </body>

@@ -1,20 +1,25 @@
 // Hex.js
 export class Hex {
-  constructor(q, r, s, terrain, terrainColor,height,precipitation = 0, temp) {
+  constructor(q, r, s, terrain, terrainColor, height, precipitation = 0, temp, waterVolume = 0, isRiver = false, flowDirection = undefined) {
     this.q = q;
     this.r = r;
     this.s = s;
     this.terrain = terrain;
     this.terrainColor = terrainColor;
-    this.height = height; // <--- new
+    this.height = height;
     this.precipitation = precipitation;
     this.temp = temp;
 
+    // river info
+    this.waterVolume = waterVolume;  // default 0
+    this.isRiver = isRiver; // default false
+    this.flowDirection = flowDirection;          
+
     // lower-level data
-    this.groundResources = new groundResources(); // wood, stone, iron, food
-    this.units = []; // array of units
-    this.buildings = []; // array of buildings
-    this.marketData = new MarketData(); // prices, demand, etc.
+    this.groundResources = new groundResources();
+    this.units = [];
+    this.buildings = [];
+    this.marketData = new MarketData();
   }
 }
 

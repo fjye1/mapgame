@@ -1,5 +1,5 @@
-import { Hex, groundResources, TopSoil } from "./Hex.js";
-import { TERRAIN_TYPES } from "./terrainConfig.js";
+import { Hex, groundResources, TopSoil } from "../public/js/Hex.js";
+import { TERRAIN_TYPES } from "../public/js/terrainConfig.js";
 import { getDateFromDay } from "/js/dateUtils.js";
 
 
@@ -282,3 +282,88 @@ export function generateMap(radius, dayOfYear) {
   
 }
 
+function generateAllResources(hexes) {
+  // hexMap = array of hex objects { q, r, s, height, temp, precip, resources:{} }
+
+  // Reset resources
+  for (const hex of hexes) {
+    hex.resources = {
+      stone: false,
+      limestone: false,
+      coal: false,
+      iron: false,
+      copper: false,
+      gold: false,
+      salt: false,
+      gemstones: false
+    };
+  }
+
+  // 1. Stone (everywhere, more in mountains)
+  for (const hex of hexes) {
+    const baseChance = 0.3 + hex.height * 0.4; // 30–70%
+    if (Math.random() < baseChance) hex.resources.stone = true;
+  }
+
+  // 2. Limestone (warm, low elevation)
+  for (const hex of hexes) {
+    if (hex.height < 0.3 && hex.temp > 0.6) {
+      if (Math.random() < 0.4) hex.resources.limestone = true;
+    }
+  }
+
+  // 3. Coal (near limestone + high precipitation)
+  for (const hex of hexes) {
+    if (hex.resources.limestone) {
+      const neighbors = getHexesInRadius(hexes, hex, 5); // custom fn
+      for (const n of neighbors) {
+        if (n.precip > 0.7 && n.height > hex.height) {
+          if (Math.random() < 0.6) n.resources.coal = true;
+        }
+      }
+    }
+  }
+
+  // 4. Iron (mountains, esp. near limestone)
+  for (const hex of hexes) {
+    if (hex.height > 0.5) {
+      const nearLimestone = getHexesInRadius(hexes, hex, 8)
+        .some(n => n.resources.limestone);
+      const chance = nearLimestone ? 0.3 : 0.1;
+      if (Math.random() < chance) hex.resources.iron = true;
+    }
+  }
+
+  // 5. Copper (mid-elevation hills)
+  for (const hex of hexes) {
+    if (hex.height > 0.4 && hex.height < 0.7) {
+      if (Math.random() < 0.2) hex.resources.copper = true;
+    }
+  }
+
+  // 6. Gold (high mountains, esp. near copper)
+  for (const hex of hexes) {
+    if (hex.height > 0.8) {
+      const nearCopper = getHexesInRadius(hexes, hex, 3)
+        .some(n => n.resources.copper);
+      const chance = nearCopper ? 0.08 : 0.03;
+      if (Math.random() < chance) hex.resources.gold = true;
+    }
+  }
+
+  // 7. Salt (hot, dry, low elevation)
+  for (const hex of hexes) {
+    if (hex.height < 0.15 && hex.temp > 0.7 && hex.precipitation < 0.3) {
+      if (Math.random() < 0.5) hex.resources.salt = true;
+    }
+  }
+
+  // 8. Gemstones (highest peaks only)
+  for (const hex of hexes) {
+    if (hex.height > 0.9) {
+      if (Math.random() < 0.05) hex.resources.gemstones = true;
+    }
+  }
+
+  return hexes;
+}
