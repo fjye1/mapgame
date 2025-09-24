@@ -1,4 +1,4 @@
-export function generateHeight(q, r, seed = 78654, options = {}) {
+export function generateHeight(q, r, seed = 89565223, options = {}) {
   const { scale = 0.05, minHeight = -1000, maxHeight = 5000 } = options;
 
   const x = (3 / 2) * q;

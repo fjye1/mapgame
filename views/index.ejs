@@ -42,6 +42,7 @@
       let currentView = "terrain";
       let views = [
         "terrain",
+        "waterVolume",
         "height",
         "temp",
         "precipitation",
@@ -172,6 +173,10 @@
             height: getHeightColor(hex),
             temp: getTempColor(hex.temp),
             precipitation: getPrecipitationColor(hex.precipitation),
+            waterVolume: getResourceColor(
+              hex.waterVolume,
+              resourceMax.waterVolume
+            ),
 
             // ground resources
             stone: getResourceColor(

@@ -1,6 +1,6 @@
 // Hex.js
 export class Hex {
-  constructor(q, r, s, terrain, terrainColor, height, precipitation = 0, temp, waterVolume = 0, isRiver = false, flowDirection = undefined) {
+  constructor(q, r, s, terrain, terrainColor, height, precipitation = 0, temp, waterVolume = 0, isRiver = false, isLake = false, flowDirection = undefined, hasOutflow = undefined) {
     this.q = q;
     this.r = r;
     this.s = s;
@@ -13,7 +13,9 @@ export class Hex {
     // river info
     this.waterVolume = waterVolume;  // default 0
     this.isRiver = isRiver; // default false
-    this.flowDirection = flowDirection;          
+    this.isLake = isLake;
+    this.flowDirection = flowDirection;
+    this.hasOutflow = hasOutflow;         
 
     // lower-level data
     this.groundResources = new groundResources();

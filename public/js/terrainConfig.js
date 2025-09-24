@@ -172,6 +172,10 @@ export function computeResourceMax(hexes) {
       ...hexes.map((h) => h.topSoil[res]?.amount || 0)
     );
   }
+  const waterValues = hexes.map((h) => h.waterVolume || 0).sort((a,b)=>a-b);
+  const idx90 = Math.floor(waterValues.length * 0.9);
+  const p90 = waterValues[idx90] || 1; // avoid divide by 0
+  resourceMax.waterVolume = p90;
 
   return resourceMax;
 }
